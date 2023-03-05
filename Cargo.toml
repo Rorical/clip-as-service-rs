@@ -1,0 +1,23 @@
+[package]
+name = "clip-as-service-rs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Rorical <rorical@shugetsu.space>"]
+license = "MIT"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+itertools = "0.10.5"
+num_cpus = "1.15.0"
+onnxruntime = "0.0.14"
+prost = "0.11.8"
+tokenizers = "0.13.2"
+tokio = { version = "1.26.0", features = ["macros", "rt-multi-thread"] }
+tonic = "0.8.3"
+
+[build-dependencies]
+tonic-build = "0.8.4"
+
+[[bin]]
+name = "clip-as-service-server"
+path = "src/server.rs"

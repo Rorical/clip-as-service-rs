@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package encoder;
+
+service Encoder {
+  rpc EncodeText (EncodeTextRequest) returns (EncodeTextResponse);
+}
+
+message EncodeTextRequest {
+  repeated string texts = 1;
+}
+
+message EncodeTextResponse {
+  repeated Embedding embedding = 2;
+}
+
+message Embedding {
+  repeated float point = 3;
+}
