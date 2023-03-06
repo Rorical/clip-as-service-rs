@@ -6,8 +6,6 @@ unsafe impl<T> Sync for UnsafeSync<T> {}
 
 impl<T> UnsafeSync<T> {
     pub fn new(internal: T) -> Self { Self(internal) }
-
-    pub fn unwrap(self) -> T { self.0 }
 }
 
 impl<T> AsMut<T> for UnsafeSync<T> {
@@ -55,8 +53,6 @@ unsafe impl<T> Sync for UnsafeSendSync<T> {}
 
 impl<T> UnsafeSendSync<T> {
     pub fn new(internal: T) -> Self { Self(internal) }
-
-    pub fn unwrap(self) -> T { self.0 }
 }
 
 impl<T> AsMut<T> for UnsafeSendSync<T> {

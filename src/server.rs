@@ -1,5 +1,5 @@
-use std::cell::{Cell, RefCell};
-use std::ops::Deref;
+use std::cell::{RefCell};
+use std::env;
 use tonic::{transport::Server, Request, Response, Status};
 pub mod encoder {
     tonic::include_proto!("encoder");
@@ -10,12 +10,12 @@ use encoder::encoder_server::{ EncoderServer, Encoder };
 use tokenizers::tokenizer::{Tokenizer};
 use onnxruntime::environment::Environment;
 use onnxruntime::GraphOptimizationLevel;
-use onnxruntime::ndarray::{Array2, Axis};
+use onnxruntime::ndarray::{Array2};
 use onnxruntime::session::Session;
 use onnxruntime::tensor::OrtOwnedTensor;
 
 use itertools::Itertools;
-use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy, tokenizer};
+use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy};
 
 mod utils;
 use crate::utils::unsafe_sync::UnsafeSendSync;
@@ -43,7 +43,7 @@ impl EncoderService {
         }));
 
         let num_cpus = num_cpus::get();
-        let mut encoder: Session  = environment
+        let encoder: Session  = environment
             .new_session_builder().unwrap()
             .with_optimization_level(GraphOptimizationLevel::All).unwrap()
             .with_number_threads(num_cpus as i16).unwrap()
@@ -90,7 +90,12 @@ impl Encoder for EncoderService {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse()?;
+    let args: Vec<String> = env::args().collect();
+    let addr = if args.len() > 1 {
+        args[1].parse()?
+    } else {
+        "[::1]:50051".parse()?
+    };
     let environment =
         Box::leak(Box::new(Environment::builder()
             .with_name("clip")
