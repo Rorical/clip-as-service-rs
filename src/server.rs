@@ -1,5 +1,6 @@
 use std::cell::{RefCell};
 use std::env;
+use std::path::Path;
 use tonic::{transport::Server, Request, Response, Status};
 pub mod encoder {
     tonic::include_proto!("encoder");
@@ -9,7 +10,7 @@ use encoder::encoder_server::{ EncoderServer, Encoder };
 
 use tokenizers::tokenizer::{Tokenizer};
 use onnxruntime::environment::Environment;
-use onnxruntime::GraphOptimizationLevel;
+use onnxruntime::{GraphOptimizationLevel};
 use onnxruntime::ndarray::{Array2};
 use onnxruntime::session::Session;
 use onnxruntime::tensor::OrtOwnedTensor;
@@ -29,8 +30,11 @@ pub struct EncoderService {
 
 impl EncoderService {
     fn new(environment: &'static Environment) -> EncoderService {
-        let model_path = "data/textual.onnx";
-        let tokenizer_path = "data/tokenizer.json";
+        let model_path = "textual.onnx";
+        let tokenizer_path = "tokenizer.json";
+
+        let root = Path::new("data/");
+        assert!(env::set_current_dir(&root).is_ok());
 
         let mut tokenizer = Tokenizer::from_file(tokenizer_path).unwrap();
         tokenizer.with_padding(Option::from(PaddingParams {
@@ -96,6 +100,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         "[::1]:50051".parse()?
     };
+
     let environment =
         Box::leak(Box::new(Environment::builder()
             .with_name("clip")
