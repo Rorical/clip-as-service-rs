@@ -9,6 +9,7 @@ jobs:
     - name: Build Rust project
       uses: actions-rs/toolchain@v1
       with:
+        toolchain: stable
         profile: release
     - name: Run tests
       run: cargo test
