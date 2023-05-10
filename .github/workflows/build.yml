@@ -1,8 +1,7 @@
 name: Rust Build
 on: [push, pull_request]
 env:
-  ORT_STRATEGY: system
-  ORT_LIB_LOCATION: ./onnxruntime-linux-x64-1.14.1/
+  ORT_STRATEGY: download
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,8 +14,6 @@ jobs:
         profile: default
     - name: Install requirement
       run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
-    - name: Download Onnx runtime
-      run: wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-1.14.1.tgz && tar -xzvf onnxruntime-linux-x64-1.14.1.tgz
     - name: Build
       run: cargo build --bin clip-as-service-server --release
     - name: Upload artifact
