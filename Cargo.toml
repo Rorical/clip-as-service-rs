@@ -7,13 +7,16 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ndarray = "0.15.0"
 itertools = "0.10.5"
 num_cpus = "1.15.0"
-onnxruntime = "0.0.14"
+ort = { git = "https://github.com/pykeio/ort.git", default-features = false }
 prost = "0.11.8"
 tokenizers = "0.13.2"
 tokio = { version = "1.26.0", features = ["macros", "rt-multi-thread"] }
 tonic = "0.8.3"
+image = "0.24.6"
+clap = { version = "4.2.4", features = ["derive"] }
 
 [build-dependencies]
 tonic-build = "0.8.4"
@@ -21,3 +24,10 @@ tonic-build = "0.8.4"
 [[bin]]
 name = "clip-as-service-server"
 path = "src/server.rs"
+
+[target.x86_64-unknown-linux-musl]
+linker = "rust-lld"
+rustflags = ["-C", "linker-flavor=ld.lld"]
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
