@@ -1,5 +1,8 @@
 name: Rust Build
-on: [push, pull_request]
+on:
+  push:
+    tags:
+      - '*'
 env:
   ORT_STRATEGY: system
   ORT_LIB_LOCATION: ./onnxruntime-linux-x64-1.14.1/lib/
@@ -24,3 +27,7 @@ jobs:
       with:
         name: clip-as-service-server
         path: target/release/clip-as-service-server
+    - name: Create Release
+      uses: ncipollo/release-action@v1.12.0
+      with:
+        artifacts: target/release/clip-as-service-server
