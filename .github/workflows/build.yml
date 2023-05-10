@@ -1,0 +1,19 @@
+name: Rust Build
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build Rust project
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: release
+    - name: Run tests
+      run: cargo test
+    - name: Upload artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: my-artifact
+        path: target/release/clip-as-service-server
