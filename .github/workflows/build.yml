@@ -12,7 +12,7 @@ jobs:
         toolchain: stable
         profile: default
     - name: Install requirement
-      run: apt update && apt-get install protobuf-compiler
+      run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
     - name: Build
       run: cargo build --bin clip-as-service-server --release
     - name: Upload artifact
