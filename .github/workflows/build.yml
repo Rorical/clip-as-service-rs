@@ -10,7 +10,7 @@ jobs:
       uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
-        profile: release
+        profile: default
     - name: Run tests
       run: cargo test
     - name: Upload artifact
