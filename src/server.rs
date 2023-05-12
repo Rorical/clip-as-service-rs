@@ -24,7 +24,7 @@ extern crate image;
 use image::io::Reader as ImageReader;
 
 use clap::Parser;
-use image::{GenericImageView, Pixel};
+use image::{GenericImageView};
 use image::imageops::FilterType;
 use crate::encoder::EncodeImageRequest;
 
@@ -43,7 +43,11 @@ struct Args {
 
     /// Vision model input image size, default 224
     #[arg(short, long, default_value_t = 224)]
-    vision_size: usize,
+    input_image_size: usize,
+
+    /// Whether to pad the input text token sequence to 77
+    #[arg(short, long, default_value_t = false)]
+    pad_token_sequence: bool
 }
 
 
@@ -72,7 +76,11 @@ impl EncoderService {
         tokenizer.with_padding(Option::from(PaddingParams {
             strategy: PaddingStrategy::BatchLongest,
             direction: PaddingDirection::Right,
-            pad_to_multiple_of: None,
+            pad_to_multiple_of: if args.pad_token_sequence {
+                Some(77)
+            } else {
+                None
+            },
             pad_id: 0,
             pad_type_id: 0,
             pad_token: "[PAD]".to_string()
@@ -87,8 +95,8 @@ impl EncoderService {
         EncoderService {
             tokenizer,
             encoder,
-            vision_mode: vision_mode,
-            vision_size: args.vision_size,
+            vision_mode,
+            vision_size: args.input_image_size,
         }
     }
 
@@ -209,7 +217,7 @@ mod tests {
         let args = Args{
             listen: "".to_string(),
             vision_mode: true,
-            vision_size: 224,
+            input_image_size: 224,
         };
         let service = EncoderService::new(&environment, &args);
 
