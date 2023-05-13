@@ -45,9 +45,9 @@ struct Args {
     #[arg(short, long, default_value_t = 224)]
     input_image_size: usize,
 
-    /// Whether to pad the input text token sequence to 77
+    /// Whether to pad and truncate the input text token sequence to 77
     #[arg(short, long, default_value_t = false)]
-    pad_token_sequence: bool
+    pad_token_sequence: bool,
 }
 
 
@@ -73,14 +73,14 @@ impl EncoderService {
         assert!(env::set_current_dir(&root).is_ok());
 
         let mut tokenizer = Tokenizer::from_file(tokenizer_path).unwrap();
-        tokenizer.with_padding(Option::from(PaddingParams {
-            strategy: PaddingStrategy::BatchLongest,
-            direction: PaddingDirection::Right,
-            pad_to_multiple_of: if args.pad_token_sequence {
-                Some(77)
+        tokenizer.with_padding(Some(PaddingParams {
+            strategy: if args.pad_token_sequence {
+                PaddingStrategy::Fixed(77)
             } else {
-                None
+                PaddingStrategy::BatchLongest
             },
+            direction: PaddingDirection::Right,
+            pad_to_multiple_of: None,
             pad_id: 0,
             pad_type_id: 0,
             pad_token: "[PAD]".to_string()
@@ -102,8 +102,18 @@ impl EncoderService {
 
     pub fn _process_text(&self, text: &Vec<String>) -> Result<Vec<Vec<f32>>, Box<dyn std::error::Error + Send + Sync>> {
         let preprocessed = self.tokenizer.encode_batch(text.clone(), true)?;
-        let v1: Vec<i32> = preprocessed.iter().map(|i| i.get_ids().iter().map(|b| *b as i32).collect()).concat();
-        let v2: Vec<i32> = preprocessed.iter().map(|i| i.get_attention_mask().iter().map(|b| *b as i32).collect()).concat();
+        let v1: Vec<i32> = preprocessed.iter().map(|i|
+            i.get_ids()
+                .iter()
+                .map(|b| *b as i32).
+                collect()
+        ).concat();
+        let v2: Vec<i32> = preprocessed.iter().map(|i|
+            i.get_attention_mask()
+                .iter()
+                .map(|b| *b as i32)
+                .collect()
+        ).concat();
 
         let ids = Array2::from_shape_vec((text.len(), v1.len()/text.len()), v1).unwrap();
         let mask = Array2::from_shape_vec((text.len(), v2.len()/text.len()), v2).unwrap();
@@ -218,6 +228,7 @@ mod tests {
             listen: "".to_string(),
             vision_mode: true,
             input_image_size: 224,
+            pad_token_sequence: false,
         };
         let service = EncoderService::new(&environment, &args);
 
