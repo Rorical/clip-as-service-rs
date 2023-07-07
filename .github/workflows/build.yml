@@ -8,7 +8,7 @@ env:
   ORT_LIB_LOCATION: ./onnxruntime-linux-x64-gpu-1.14.1/lib/
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     permissions:
       contents: write
     steps:
