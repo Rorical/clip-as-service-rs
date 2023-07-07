@@ -186,13 +186,17 @@ impl Encoder for EncoderService {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
+
     let args = Args::parse();
 
     let addr: &String = &args.listen;
+
     let environment =
         Arc::new(Environment::builder()
-            .with_name("clip")
-            .build().unwrap());
+                .with_name("clip")
+                .with_execution_providers([ExecutionProvider::cuda()])
+                .build().unwrap());
 
     let server = EncoderService::new(&environment, &args);
 
