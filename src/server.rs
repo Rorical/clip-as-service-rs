@@ -118,7 +118,7 @@ impl EncoderService {
         let ids = Array2::from_shape_vec((text.len(), v1.len()/text.len()), v1).unwrap();
         let mask = Array2::from_shape_vec((text.len(), v2.len()/text.len()), v2).unwrap();
 
-        let outputs= self.encoder.run([InputTensor::from_array(ids.into_dyn()), InputTensor::from_array(mask.into_dyn())]).unwrap();
+        let outputs= self.encoder.run([InputTensor::from_array(ids.into_dyn()), InputTensor::from_array(mask.into_dyn())])?;
         let binding = outputs[0].try_extract().unwrap();
         let embeddings = binding.view();
 
@@ -142,7 +142,7 @@ impl EncoderService {
             }
         }
 
-        let outputs= self.encoder.run([InputTensor::from_array(pixels.into_dyn())]).unwrap();
+        let outputs= self.encoder.run([InputTensor::from_array(pixels.into_dyn())])?;
         let binding = outputs[0].try_extract().unwrap();
         let embeddings = binding.view();
 
@@ -195,7 +195,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let environment =
         Arc::new(Environment::builder()
                 .with_name("clip")
-                .with_execution_providers([ExecutionProvider::cuda()])
+                .with_execution_providers([ExecutionProvider::cuda(), ExecutionProvider::cpu()])
                 .build().unwrap());
 
     let server = EncoderService::new(&environment, &args);
