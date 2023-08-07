@@ -5,7 +5,7 @@ on:
       - '*'
 env:
   ORT_STRATEGY: system
-  ORT_LIB_LOCATION: ./onnxruntime-linux-x64-gpu-1.14.1/lib/
+  ORT_LIB_LOCATION: ./onnxruntime-linux-x64-gpu-1.15.1/lib/
 jobs:
   build:
     runs-on: ubuntu-20.04
@@ -21,7 +21,7 @@ jobs:
     - name: Install requirement
       run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
     - name: Download Onnx runtime
-      run: wget https://github.com/microsoft/onnxruntime/releases/download/v1.14.1/onnxruntime-linux-x64-gpu-1.14.1.tgz && tar -xzvf onnxruntime-linux-x64-gpu-1.14.1.tgz
+      run: wget https://github.com/microsoft/onnxruntime/releases/download/v1.15.1/onnxruntime-linux-x64-gpu-1.15.1.tgz && tar -xzvf onnxruntime-linux-x64-gpu-1.15.1.tgz
     - name: Build
       run: cargo build --bin clip-as-service-server --release
     - name: Upload artifact
