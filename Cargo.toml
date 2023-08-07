@@ -10,7 +10,7 @@ license = "MIT"
 ndarray = "0.15.0"
 itertools = "0.10.5"
 num_cpus = "1.15.0"
-ort = { git = "https://github.com/pykeio/ort.git", features = ["cuda"] }
+ort = { git = "https://github.com/pykeio/ort.git", features = ["cuda", "openvino"] }
 prost = "0.11.8"
 tokenizers = "0.13.2"
 tokio = { version = "1.26.0", features = ["macros", "rt-multi-thread"] }

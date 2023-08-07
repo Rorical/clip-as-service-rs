@@ -1,8 +1,8 @@
 use std::env;
 use std::io::Cursor;
-use std::ops::Index;
+use std::ops::{Deref, Index};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tonic::{transport::Server, Request, Response, Status};
 pub mod encoder {
     tonic::include_proto!("encoder");
@@ -11,12 +11,9 @@ use encoder::{ EncodeTextRequest, EncoderResponse, Embedding };
 use encoder::encoder_server::{ EncoderServer, Encoder };
 
 use tokenizers::tokenizer::{Tokenizer};
-use ndarray::{Array, Array2, Array3, Array4, ArrayBase, ArrayD, ArrayView3, Axis, Dim, OwnedRepr, s, stack, ViewRepr};
+use ndarray::{Array, Array2, Array3, Array4, ArrayBase, ArrayD, ArrayView3, Axis, CowArray, Dim, OwnedRepr, s, stack, ViewRepr};
 use ort::session::Session;
-use ort::{
-    tensor::{DynOrtTensor, FromArray, InputTensor, OrtOwnedTensor},
-    Environment, ExecutionProvider, GraphOptimizationLevel, OrtResult, SessionBuilder
-};
+use ort::{Environment, ExecutionProvider, GraphOptimizationLevel, SessionBuilder, Value};
 
 use itertools::Itertools;
 use tokenizers::{PaddingDirection, PaddingParams, PaddingStrategy};
@@ -30,7 +27,7 @@ use crate::encoder::EncodeImageRequest;
 
 extern crate num_cpus;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(author = "Ro <rorical@shugetsu.space>", version = "0.1", about = "Clip service", long_about = None)]
 struct Args {
     /// Address to listen
@@ -59,7 +56,7 @@ pub struct EncoderService {
 }
 
 impl EncoderService {
-    fn new(environment: &Arc<Environment>, args: &Args) -> EncoderService {
+    fn new(environment: &Arc<Environment>, args: Args) -> Result<EncoderService, Box<dyn std::error::Error + Send + Sync>> {
         let vision_mode = args.vision_mode;
 
         let model_path = if vision_mode {
@@ -72,7 +69,7 @@ impl EncoderService {
         let root = Path::new("data/");
         assert!(env::set_current_dir(&root).is_ok());
 
-        let mut tokenizer = Tokenizer::from_file(tokenizer_path).unwrap();
+        let mut tokenizer = Tokenizer::from_file(tokenizer_path)?;
         tokenizer.with_padding(Some(PaddingParams {
             strategy: if args.pad_token_sequence {
                 PaddingStrategy::Fixed(77)
@@ -87,17 +84,20 @@ impl EncoderService {
         }));
 
         let num_cpus = num_cpus::get();
-        let encoder = SessionBuilder::new(environment).unwrap()
-            .with_inter_threads(num_cpus as i16).unwrap()
-            .with_optimization_level(GraphOptimizationLevel::Level2).unwrap()
-            .with_model_from_file(model_path).unwrap();
+        let encoder = SessionBuilder::new(environment)?
+            .with_parallel_execution(true)?
+            .with_intra_threads(num_cpus as i16)?
+            .with_optimization_level(GraphOptimizationLevel::Level3)?
+            .with_model_from_file(model_path)?;
 
-        EncoderService {
+
+
+        Ok(EncoderService {
             tokenizer,
             encoder,
             vision_mode,
             vision_size: args.input_image_size,
-        }
+        })
     }
 
     pub fn _process_text(&self, text: &Vec<String>) -> Result<Vec<Vec<f32>>, Box<dyn std::error::Error + Send + Sync>> {
@@ -115,14 +115,15 @@ impl EncoderService {
                 .collect()
         ).concat();
 
-        let ids = Array2::from_shape_vec((text.len(), v1.len()/text.len()), v1).unwrap();
-        let mask = Array2::from_shape_vec((text.len(), v2.len()/text.len()), v2).unwrap();
+        let ids = CowArray::from(Array2::from_shape_vec((text.len(), v1.len()/text.len()), v1)?).into_dyn();
+        let mask = CowArray::from(Array2::from_shape_vec((text.len(), v2.len()/text.len()), v2)?).into_dyn();
 
-        let outputs= self.encoder.run([InputTensor::from_array(ids.into_dyn()), InputTensor::from_array(mask.into_dyn())])?;
-        let binding = outputs[0].try_extract().unwrap();
+        let session = &self.encoder;
+        let outputs= session.run(vec![Value::from_array(session.allocator(), &ids)?, Value::from_array(session.allocator(), &mask)?])?;
+        let binding = outputs[0].try_extract()?;
         let embeddings = binding.view();
 
-        let seq_len = embeddings.shape().get(1).unwrap();
+        let seq_len = embeddings.shape().get(1).ok_or("not")?;
 
         Ok(embeddings.iter().map(|s| *s).chunks(*seq_len).into_iter().map(|b| b.collect()).collect())
     }
@@ -131,7 +132,7 @@ impl EncoderService {
         let mean = vec![0.48145466, 0.4578275, 0.40821073]; // CLIP Dataset
         let std = vec![0.26862954, 0.26130258, 0.27577711];
 
-        let mut pixels = Array4::<f32>::zeros(Dim([images_bytes.len(), 3, self.vision_size, self.vision_size]));
+        let mut pixels = CowArray::from(Array4::<f32>::zeros(Dim([images_bytes.len(), 3, self.vision_size, self.vision_size])));
         for (index, image_bytes) in images_bytes.iter().enumerate() {
             let image = ImageReader::new(Cursor::new(image_bytes)).with_guessed_format()?.decode()?;
             let image = image.resize_exact(self.vision_size as u32, self.vision_size as u32, FilterType::CatmullRom);
@@ -142,8 +143,9 @@ impl EncoderService {
             }
         }
 
-        let outputs= self.encoder.run([InputTensor::from_array(pixels.into_dyn())])?;
-        let binding = outputs[0].try_extract().unwrap();
+        let session = &self.encoder;
+        let outputs= session.run(vec![Value::from_array(session.allocator(), &pixels.into_dyn())?])?;
+        let binding = outputs[0].try_extract()?;
         let embeddings = binding.view();
 
         let seq_len = embeddings.shape().get(1).unwrap();
@@ -159,33 +161,46 @@ impl Encoder for EncoderService {
             return Err(Status::invalid_argument("wrong model is loaded"))
         }
         let texts = &request.get_ref().texts;
-        let embedding = self._process_text(texts).unwrap().into_iter().map(
-            |i| Embedding {
-                point: i,
+        return match self._process_text(texts) {
+            Ok(d) => {
+                let embedding =  d.into_iter().map(
+                    | i | Embedding {
+                        point: i,
+                    }
+                ).collect();
+                Ok(Response::new(EncoderResponse {
+                    embedding,
+                }))},
+            Err(e) => {
+                Err(Status::internal(format!("{:?}", e)))
             }
-        ).collect();
-        Ok(Response::new(EncoderResponse {
-            embedding,
-        }))
+        }
     }
     async fn encode_image(&self, request: Request<EncodeImageRequest>) -> Result<Response<EncoderResponse>, Status> {
         if !self.vision_mode {
             return Err(Status::invalid_argument("wrong model is loaded"))
         }
         let images = &request.get_ref().images;
-        let embedding = self._process_image(images).unwrap().into_iter().map(
-            |i| Embedding {
-                point: i,
-            }
-        ).collect();
-        Ok(Response::new(EncoderResponse {
-            embedding
-        }))
+        return match self._process_image(images) {
+            Ok(d) => {
+                let embedding = d.into_iter().map(
+                    |i| Embedding {
+                        point: i,
+                    }
+                ).collect();
+                Ok(Response::new(EncoderResponse {
+                    embedding
+                }))
+            },
+            Err(e) => {
+                Err(Status::internal(format!("{:?}", e)))
+            },
+        }
     }
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing_subscriber::fmt::init();
 
     let args = Args::parse();
@@ -193,55 +208,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr: &String = &args.listen;
 
     let environment =
-        Arc::new(Environment::builder()
+        Environment::builder()
                 .with_name("clip")
-                .with_execution_providers([ExecutionProvider::cuda(), ExecutionProvider::cpu()])
-                .build().unwrap());
-
-    let server = EncoderService::new(&environment, &args);
+                .with_execution_providers([
+                    ExecutionProvider::CUDA(Default::default()),
+                    ExecutionProvider::OpenVINO(Default::default()),
+                    ExecutionProvider::CPU(Default::default())
+                ])
+                .build()?
+            .into_arc();
 
     println!("Listening at {:?} with {} mode.", addr, if args.vision_mode {
         "vision"
     } else {
         "text"
     });
+
+    let server = EncoderService::new(&environment, args.clone())?;
+
     Server::builder()
         .add_service(EncoderServer::new(server))
         .serve(addr.parse()?)
         .await?;
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use std::io;
-    use std::io::prelude::*;
-    use std::fs::File;
-    use std::sync::Arc;
-    use ort::environment::Environment;
-    use crate::{Args, EncoderService};
-
-    #[test]
-    fn it_works() {
-        let environment =
-            Arc::new(Environment::builder()
-                .with_name("clip")
-                .build().unwrap());
-        let args = Args{
-            listen: "".to_string(),
-            vision_mode: true,
-            input_image_size: 224,
-            pad_token_sequence: false,
-        };
-        let service = EncoderService::new(&environment, &args);
-
-        let mut f = File::open("test.jpg").unwrap();
-        let mut buffer = Vec::new();
-        f.read_to_end(&mut buffer).unwrap();
-
-        let images = vec![buffer];
-        let emb = service._process_image(&images).unwrap();
-        println!("{:?}", emb[0].len());
-    }
 }
