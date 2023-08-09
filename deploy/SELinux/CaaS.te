@@ -1,0 +1,54 @@
+policy_module(CaaS, 1.0.0)
+
+########################################
+#
+# Declarations
+#
+
+require {
+	attribute file_type;
+        type sysfs_t;
+        type proc_t;
+        type node_t;
+        type cgroup_t;
+        class file { execute getattr map open read };
+        class dir search;
+        class tcp_socket { accept bind create getattr listen node_bind setopt };
+}
+
+type CaaS_t;
+type CaaS_exec_t;
+type CaaS_dir_t, file_type;
+type CaaS_var_lib_t, file_type;
+type CaaS_var_run_t, file_type;
+
+init_daemon_domain(CaaS_t, CaaS_exec_t)
+
+permissive CaaS_t;
+
+
+########################################
+#
+# CaaS local policy
+#
+allow CaaS_t self:fifo_file rw_fifo_file_perms;
+allow CaaS_t self:unix_stream_socket create_stream_socket_perms;
+
+allow CaaS_t CaaS_var_lib_t:file { execute getattr open read map };
+allow CaaS_t CaaS_var_run_t:file { getattr open read };
+allow CaaS_t CaaS_dir_t:dir { getattr search };
+allow CaaS_t CaaS_dir_t:file { getattr open read write };
+
+allow CaaS_t cgroup_t:dir search;
+allow CaaS_t cgroup_t:file { getattr open read };
+allow CaaS_t node_t:tcp_socket node_bind;
+allow CaaS_t proc_t:file { open read };
+allow CaaS_t self:tcp_socket { accept bind create getattr listen setopt };
+allow CaaS_t sysfs_t:file { open read };
+
+
+domain_use_interactive_fds(CaaS_t)
+
+files_read_etc_files(CaaS_t)
+
+miscfiles_read_localization(CaaS_t)

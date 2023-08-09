@@ -1,0 +1,4 @@
+/var/services/CaaS(\/.+)?	-d	gen_context(system_u:object_r:CaaS_dir_t,s0)
+/var/services/CaaS/bin/.* 	--	gen_context(system_u:object_r:CaaS_exec_t,s0)
+/var/services/CaaS/lib/.* 	--      gen_context(system_u:object_r:CaaS_var_lib_t,s0)
+/var/services/CaaS/data/.* 	--      gen_context(system_u:object_r:CaaS_var_run_t,s0)

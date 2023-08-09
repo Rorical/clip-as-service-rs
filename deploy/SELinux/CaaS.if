@@ -1,0 +1,40 @@
+
+## <summary>policy for CaaS</summary>
+
+########################################
+## <summary>
+##	Execute CaaS_exec_t in the CaaS domain.
+## </summary>
+## <param name="domain">
+## <summary>
+##	Domain allowed to transition.
+## </summary>
+## </param>
+#
+interface(`CaaS_domtrans',`
+	gen_require(`
+		type CaaS_t, CaaS_exec_t;
+	')
+
+	corecmd_search_bin($1)
+	domtrans_pattern($1, CaaS_exec_t, CaaS_t)
+')
+
+######################################
+## <summary>
+##	Execute CaaS in the caller domain.
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed access.
+##	</summary>
+## </param>
+#
+interface(`CaaS_exec',`
+	gen_require(`
+		type CaaS_exec_t;
+	')
+
+	corecmd_search_bin($1)
+	can_exec($1, CaaS_exec_t)
+')
